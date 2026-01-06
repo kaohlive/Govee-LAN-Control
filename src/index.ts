@@ -305,6 +305,13 @@ class Govee extends EventEmitter
             case "devStatus":
                 var device = deviceList.get(rinfo.address);
 
+                // Guard against receiving status from unknown device (fixes issue #12)
+                // This can happen when we receive a status update from a device
+                // that hasn't been discovered yet or was removed from the list
+                if (!device) {
+                    return;
+                }
+
                 var oldState = JSON.parse(JSON.stringify(device.state));
                 device.state.brightness = data.brightness;
                 device.state.isOn = data.onOff;
