@@ -315,47 +315,68 @@ var port = 4002;
 var createSocket_default = () => {
   return new Promise((resolve, reject) => {
     const nets = (0, import_os.networkInterfaces)();
-    var sockets = [];
     var isResolved = false;
-    for (const name of Object.keys(nets)) {
-      nets[name]?.forEach((net) => {
-        const familyV4Value = typeof net.family === "string" ? "IPv4" : 4;
-        if (net.family === familyV4Value && !net.internal) {
-          let socket = (0, import_node_dgram.createSocket)({
-            type: "udp4",
-            reuseAddr: true
-          });
-          sockets.push(socket);
-          socket.once("message", (msg, remote) => {
-            resolve(socket);
-            isResolved = true;
-          });
-          socket.bind(port, net.address);
-          socket.on("listening", function() {
-            socket.setBroadcast(true);
-            socket.setMulticastTTL(128);
-            socket.addMembership(address);
-            let message = JSON.stringify(
-              {
-                "msg": {
-                  "cmd": "scan",
-                  "data": {
-                    "account_topic": "reserve"
-                  }
-                }
-              }
-            );
-            socket.send(message, 0, message.length, 4001, address);
-          });
-        }
-      });
-    }
-    setTimeout(() => {
-      if (isResolved == false) {
-        sockets.forEach((socket) => {
-          socket.close();
+    var hasError = false;
+    let socket = (0, import_node_dgram.createSocket)({
+      type: "udp4",
+      reuseAddr: true
+    });
+    socket.on("error", (err) => {
+      if (!isResolved && !hasError) {
+        hasError = true;
+        console.error(`[govee-lan-control] Socket error: ${err.message}`);
+      }
+    });
+    socket.once("message", (msg, remote) => {
+      if (!isResolved) {
+        resolve(socket);
+        isResolved = true;
+      }
+    });
+    socket.bind(port, "0.0.0.0", () => {
+      socket.setBroadcast(true);
+      socket.setMulticastTTL(128);
+      let joinedAny = false;
+      for (const name of Object.keys(nets)) {
+        nets[name]?.forEach((net) => {
+          const familyV4Value = typeof net.family === "string" ? "IPv4" : 4;
+          if (net.family === familyV4Value && !net.internal) {
+            try {
+              socket.addMembership(address, net.address);
+              joinedAny = true;
+            } catch (err) {
+              console.warn(`[govee-lan-control] Could not join multicast on ${name} (${net.address}): ${err.message}`);
+            }
+          }
         });
-        resolve(void 0);
+      }
+      if (!joinedAny) {
+        console.error("[govee-lan-control] Warning: Could not join multicast group on any interface");
+      }
+      let message = JSON.stringify(
+        {
+          "msg": {
+            "cmd": "scan",
+            "data": {
+              "account_topic": "reserve"
+            }
+          }
+        }
+      );
+      socket.send(message, 0, message.length, 4001, address);
+    });
+    setTimeout(() => {
+      if (!isResolved) {
+        if (!hasError) {
+          resolve(socket);
+          isResolved = true;
+        } else {
+          try {
+            socket.close();
+          } catch (e) {
+          }
+          resolve(void 0);
+        }
       }
     }, 5e3);
   });
@@ -528,6 +549,9 @@ var Govee = class extends import_events.EventEmitter {
         break;
       case "devStatus":
         var device = deviceList.get(rinfo.address);
+        if (!device) {
+          return;
+        }
         var oldState = JSON.parse(JSON.stringify(device.state));
         device.state.brightness = data.brightness;
         device.state.isOn = data.onOff;
