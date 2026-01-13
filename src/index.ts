@@ -258,7 +258,9 @@ class Govee extends EventEmitter
             this.discoverTimes[dev.ip] ||= 0;
             this.discoverTimes[dev.ip]++;
 
-            if (this.discoverTimes[dev.ip] >= 5)
+            // Only remove device after 20 missed scans (~10 minutes with 30s interval)
+            // This is more tolerant of temporary network issues
+            if (this.discoverTimes[dev.ip] >= 20)
             {
                 eventEmitter.emit("deviceRemoved", dev);
                 dev.destroy();

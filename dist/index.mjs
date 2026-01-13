@@ -482,7 +482,7 @@ var Govee = class extends EventEmitter {
       udpSocket.send(message, 0, message.length, 4003, dev.ip);
       this.discoverTimes[dev.ip] ||= 0;
       this.discoverTimes[dev.ip]++;
-      if (this.discoverTimes[dev.ip] >= 5) {
+      if (this.discoverTimes[dev.ip] >= 20) {
         eventEmitter.emit("deviceRemoved", dev);
         dev.destroy();
         deviceList.delete(dev.ip);
