@@ -165,11 +165,7 @@ class Govee extends EventEmitter
         eventEmitter = this;
         this.config = config;
 
-        this.getSocket().then(() =>
-        {
-            this.emit("ready");
-            this.isReady = true;
-        });
+        this.getSocket();
 
         var discoverInterval = 60_000;
 
@@ -275,7 +271,14 @@ class Govee extends EventEmitter
 
     private receiveMessage = async (msg: Buffer, rinfo: RemoteInfo) =>
     {
-        var msgRes: messageResponse = JSON.parse(msg.toString());
+        var msgRes: messageResponse;
+        try {
+            msgRes = JSON.parse(msg.toString());
+        } catch (e) {
+            // Some devices send malformed JSON with control characters
+            // Silently ignore these messages to prevent crashes
+            return;
+        }
         if (!udpSocket)
         {
             return;

@@ -454,10 +454,7 @@ var Govee = class extends import_events.EventEmitter {
     super();
     eventEmitter = this;
     this.config = config;
-    this.getSocket().then(() => {
-      this.emit("ready");
-      this.isReady = true;
-    });
+    this.getSocket();
     var discoverInterval = 6e4;
     if (config && config.discoverInterval) {
       discoverInterval = config.discoverInterval;
@@ -526,7 +523,12 @@ var Govee = class extends import_events.EventEmitter {
   };
   discoverTimes = /* @__PURE__ */ new Map();
   receiveMessage = async (msg, rinfo) => {
-    var msgRes = JSON.parse(msg.toString());
+    var msgRes;
+    try {
+      msgRes = JSON.parse(msg.toString());
+    } catch (e) {
+      return;
+    }
     if (!udpSocket) {
       return;
     }
